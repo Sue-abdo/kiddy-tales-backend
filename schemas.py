@@ -1,17 +1,19 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
+from datetime import datetime
 
 
 # ════════════════════════════════
 #        USER SCHEMAS
 # ════════════════════════════════
-
 class UserCreate(BaseModel):
-    name: str
-    email: EmailStr
+    name: str                                    # اسم الـ parent
+    child_name: Optional[str] = None             # اسم الطفل
+    email: EmailStr                              # email الـ parent
+    child_email: Optional[EmailStr] = None       # email الطفل
     password: str
     child_age: int
-    parent_email: Optional[EmailStr] = None
+
 
 
 class UserLogin(BaseModel):
@@ -20,10 +22,12 @@ class UserLogin(BaseModel):
 
 
 class UserProfileResponse(BaseModel):
+    id: int
     name: str
+    child_name: Optional[str] = None
     email: str
-    child_age: int
-    parent_email: Optional[str] = None
+    child_email: Optional[str] = None
+    child_age: int   
 
     class Config:
         from_attributes = True
@@ -39,7 +43,6 @@ class UserUpdate(BaseModel):
 # ════════════════════════════════
 #        WORD SCHEMAS
 # ════════════════════════════════
-
 class WordCreate(BaseModel):
     word: str
     level: int
@@ -49,7 +52,7 @@ class WordResponse(BaseModel):
     id: int
     word: str
     level: int
-    sound: Optional[str] = None  # URL بتاع الـ audio
+    sound: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -60,9 +63,8 @@ class WordsListResponse(BaseModel):
 
 
 # ════════════════════════════════
-#        AI SCHEMAS
+#        AI — Evaluate SCHEMAS
 # ════════════════════════════════
-
 class AudioResponse(BaseModel):
     word: str
     sound_url: str
@@ -75,3 +77,73 @@ class EvaluateResponse(BaseModel):
     score: int
     feedback: str
     is_correct: bool
+
+
+# ════════════════════════════════
+#   STORY SCHEMAS — الترتيب مهم!
+# ════════════════════════════════
+
+# 1 — لازم يكون الأول
+class CorrectionItem(BaseModel):
+    wrong: str
+    right: str
+
+
+# 2
+class StoryQuestionResponse(BaseModel):
+    id: int
+    question: str
+    correct_answer: str
+
+    class Config:
+        from_attributes = True
+
+
+# 3 — بعد CorrectionItem و StoryQuestionResponse
+class StoryResponse(BaseModel):
+    id: int
+    original_words: str
+    corrected_words: str
+    was_corrected: bool
+    corrections: List[CorrectionItem]
+    story: str
+    story_audio_url: str    # ← الطفل يضغط يسمع القصة
+    image_url: str
+    questions: List[StoryQuestionResponse]
+    parent_feedback: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ════════════════════════════════
+#   ANSWERS SCHEMAS
+# ════════════════════════════════
+class QuestionAnswer(BaseModel):
+    question_id: int
+    child_answer: str
+
+
+class AnswersRequest(BaseModel):
+    story_id: int
+    token: str          # ← بدل user_id
+    answers: List[QuestionAnswer]
+
+class AnswerResult(BaseModel):
+    question_id: int
+    question: str
+    child_answer: str
+    correct_answer: str
+    is_correct: bool
+    feedback: str
+
+
+class AnswersEvaluationResponse(BaseModel):
+    story_id: int
+    total_questions: int
+    correct_answers: int
+    score: int
+    child_feedback: str
+    parent_feedback: str
+    results: List[AnswerResult]

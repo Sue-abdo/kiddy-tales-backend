@@ -15,5 +15,6 @@ gtts
 aiofiles
 ffmpeg-python
 python-Levenshtein
+groq
 #pip install -r requirements.txt
 #python -m uvicorn main:app --reload

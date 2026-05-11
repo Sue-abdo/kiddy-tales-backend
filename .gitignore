@@ -1,23 +1,23 @@
 # Environment variables
 .env
-
 # Python
 __pycache__/
 *.pyc
 *.pyo
 venv/
 .venv/
-
 # Audio files
 static/
 *.mp3
 *.wav
 *.mpeg
-
 # Windows executables
 *.exe
 *.dll
-
 # Large model files
 *.pt
 *.bin
+ffmpeg*
+# token github: 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
+# token huggingface : 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
+# GROQ_API_KEY : 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
