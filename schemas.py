@@ -90,6 +90,24 @@ class EvaluateResponse(BaseModel):
     feedback: str
     is_correct: bool
 
+class PronunciationResultResponse(BaseModel):
+    id: int
+    word_id: int
+    whisper_heard: str
+    score: int
+    is_correct: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ProgressResponse(BaseModel):
+    child_name: str
+    total_attempts: int
+    correct_attempts: int
+    success_rate: float
+    results: List[PronunciationResultResponse]
+
 
 # ════════════════════════════════
 #   STORY SCHEMAS — الترتيب مهم!
