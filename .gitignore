@@ -11,6 +11,7 @@ static/
 *.mp3
 *.wav
 *.mpeg
+*.png
 # Windows executables
 *.exe
 *.dll
