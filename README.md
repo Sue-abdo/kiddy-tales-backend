@@ -1,5 +1,5 @@
 ---
-title: English Buddy Backend
+title: Kiddi Tales 
 emoji: 📚
 colorFrom: blue
 colorTo: green
