@@ -1,20 +1,26 @@
 # Environment variables
 .env
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
+
 venv/
 .venv/
+
 # Audio files
 static/
 *.mp3
 *.wav
-*.mpeg
 *.png
+*.exe
+*.dll
+
 # Windows executables
 *.exe
 *.dll
+
 # Large model files
 *.pt
 *.bin
