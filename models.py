@@ -3,23 +3,22 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
 
-# ════════════════════════════════
-#     User Table
-# ════════════════════════════════
+# == Models for the application ==
+#== User model to store parent and child information ===
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)           # اسم الـ parent
-    child_name = Column(String, nullable=True)      # اسم الطفل
+    name = Column(String, nullable=False)
+    child_name = Column(String, nullable=False)
     child_age = Column(Integer, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)  # email الـ parent
-    child_email = Column(String, nullable=True)     # email الطفل
+    email = Column(String, nullable=False)         # ← مش unique عشان parent ممكن يسجل أكتر من طفل
+    child_email = Column(String, unique=True, nullable=False)  # ← unique
     hashed_password = Column(String, nullable=False)
-    
-#═══════════════════════════════
-#     NEW: Words Table
-# ════════════════════════════════
+    is_verified = Column(Boolean, default=False)   # ← اتأكد من الـ email ولا لسه
+    verification_code = Column(String, nullable=True)  # ← الكود المؤقت
+
+#== Word model to store words for different levels ==
 class Word(Base):
     __tablename__ = "words"
     id = Column(Integer, primary_key=True, index=True)
@@ -27,66 +26,45 @@ class Word(Base):
     level = Column(Integer, nullable=False)
     sound = Column(String, nullable=True)
 
-
-# ════════════════════════════════
-#     NEW: Story Table
-# ════════════════════════════════
+#== Story model to store stories created by parents and answered by children ==
 class Story(Base):
     __tablename__ = "stories"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    original_words = Column(String, nullable=False)   # اللي كتبه الطفل
-    corrected_words = Column(String, nullable=False)  # بعد التصحيح
+    original_words = Column(String, nullable=False)
+    corrected_words = Column(String, nullable=False)
     was_corrected = Column(Boolean, default=False)
     story_text = Column(Text, nullable=False)
     image_url = Column(String, nullable=True)
+    story_audio_url = Column(String, nullable=True)
     parent_feedback = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    story_audio_url = Column(String, nullable=True)  # ← URL صوت القصة
-    # relationship
     questions = relationship("StoryQuestion", back_populates="story")
 
-
-# ════════════════════════════════
-#     NEW: Questions Table
-# ════════════════════════════════
+#== StoryQuestion model to store questions related to each story ==
 class StoryQuestion(Base):
     __tablename__ = "story_questions"
-
     id = Column(Integer, primary_key=True, index=True)
     story_id = Column(Integer, ForeignKey("stories.id"), nullable=False)
     question = Column(String, nullable=False)
     correct_answer = Column(String, nullable=False)
-
-    # relationship
     story = relationship("Story", back_populates="questions")
     child_answer = relationship("ChildAnswer", back_populates="question", uselist=False)
 
-
-# ════════════════════════════════
-#     NEW: Child Answers Table
-# ════════════════════════════════
+#== ChildAnswer model to store answers provided by children for each question ==
 class ChildAnswer(Base):
     __tablename__ = "child_answers"
-
     id = Column(Integer, primary_key=True, index=True)
     question_id = Column(Integer, ForeignKey("story_questions.id"), nullable=False)
     child_answer = Column(String, nullable=False)
     is_correct = Column(Boolean, default=False)
     score = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    # relationship
     question = relationship("StoryQuestion", back_populates="child_answer")
 
-
-# ════════════════════════════════
-#     NEW: Story Result Table
-# ════════════════════════════════
+#== StoryResult model to store the results of each story attempt by children ==
 class StoryResult(Base):
     __tablename__ = "story_results"
-
     id = Column(Integer, primary_key=True, index=True)
     story_id = Column(Integer, ForeignKey("stories.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

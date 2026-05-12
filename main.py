@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from jose import jwt
+from email_service import generate_verification_code, send_verification_email
 import bcrypt
 import uvicorn
 import models, schemas, database
@@ -87,12 +88,20 @@ def verify_password(plain_password, hashed_password):
 # ════════════════════════════════
 @app.post("/signup", tags=["Auth"])
 def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
-    db_user = db.query(models.User).filter(
-        models.User.email == user.email
+    # 1. تأكدي إن الـ child_email مش موجود
+    existing_child = db.query(models.User).filter(
+        models.User.child_email == user.child_email
     ).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    if existing_child:
+        raise HTTPException(
+            status_code=400,
+            detail="This child email is already registered"
+        )
 
+    # 2. عملي verification code
+    code = generate_verification_code()
+
+    # 3. حفظي الـ user مع الكود
     new_user = models.User(
         name=user.name,
         child_name=user.child_name,
@@ -100,15 +109,52 @@ def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
         child_email=user.child_email,
         hashed_password=hash_password(user.password),
         child_age=user.child_age,
+        is_verified=False,
+        verification_code=code
     )
     db.add(new_user)
     db.commit()
-    return {"message": "User created successfully!"}
 
+    # 4. ابعتي الكود على الـ email
+    sent = send_verification_email(user.email, code, user.child_name)
+
+    if sent:
+        return {
+            "message": f"Verification code sent to {user.email}. Please verify your email.",
+            "email": user.email
+        }
+    else:
+        return {
+            "message": "Account created but email could not be sent. Contact support.",
+            "email": user.email
+        }
+
+@app.post("/verify-email", tags=["Auth"])
+def verify_email(email: str, code: str, db: Session = Depends(database.get_db)):
+    """Parent enters the 6-digit code they received"""
+    user = db.query(models.User).filter(
+        models.User.email == email,
+        models.User.verification_code == code
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid email or verification code"
+        )
+
+    if user.is_verified:
+        return {"message": "Email already verified!"}
+
+    # تأكيد الـ email
+    user.is_verified = True
+    user.verification_code = None
+    db.commit()
+
+    return {"message": "Email verified successfully! You can now login. ✅"}
 
 @app.post("/login", tags=["Auth"])
 def login(user_credentials: schemas.UserLogin, db: Session = Depends(database.get_db)):
-    """Parent logs in and gets a token"""
     user = db.query(models.User).filter(
         models.User.email == user_credentials.email
     ).first()
@@ -116,14 +162,43 @@ def login(user_credentials: schemas.UserLogin, db: Session = Depends(database.ge
     if not user or not verify_password(user_credentials.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid Credentials")
 
+    # تأكدي إن الـ email متأكد منه
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email first. Check your inbox."
+        )
+
     access_token = create_access_token(
         data={"sub": user.email, "user_name": user.name}
     )
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user_name": user.name
+        "user_name": user.name,
+        "child_name": user.child_name
     }
+
+@app.post("/resend-code", tags=["Auth"])
+def resend_code(email: str, db: Session = Depends(database.get_db)):
+    """Resend verification code"""
+    user = db.query(models.User).filter(
+        models.User.email == email
+    ).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    if user.is_verified:
+        return {"message": "Email already verified!"}
+
+    # عملي كود جديد
+    new_code = generate_verification_code()
+    user.verification_code = new_code
+    db.commit()
+
+    send_verification_email(email, new_code, user.child_name)
+    return {"message": f"New verification code sent to {email}"}
 
 
 @app.get("/profile", response_model=schemas.UserProfileResponse, tags=["Auth"])

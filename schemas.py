@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -7,14 +7,26 @@ from datetime import datetime
 #        USER SCHEMAS
 # ════════════════════════════════
 class UserCreate(BaseModel):
-    name: str                                    # اسم الـ parent
-    child_name: Optional[str] = None             # اسم الطفل
-    email: EmailStr                              # email الـ parent
-    child_email: Optional[EmailStr] = None       # email الطفل
+    name: str
+    child_name: str
+    email: EmailStr                    # ← validation أوتوماتيك
+    child_email: EmailStr              # ← validation أوتوماتيك
     password: str
     child_age: int
 
+    @field_validator('child_age')
+    @classmethod
+    def validate_age(cls, v):
+        if v < 6 or v > 11:
+            raise ValueError('Child age must be between 6 and 11')
+        return v
 
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters')
+        return v
 
 class UserLogin(BaseModel):
     email: EmailStr
