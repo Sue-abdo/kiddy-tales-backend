@@ -18,6 +18,7 @@ class User(Base):
     is_verified = Column(Boolean, default=False)   # ← اتأكد من الـ email ولا لسه
     verification_code = Column(String, nullable=True)  # ← الكود المؤقت
 
+
 #== Word model to store words for different levels ==
 class Word(Base):
     __tablename__ = "words"
@@ -26,6 +27,16 @@ class Word(Base):
     level = Column(Integer, nullable=False)
     sound = Column(String, nullable=True)
 
+class PronunciationResult(Base):
+    __tablename__ = "pronunciation_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    word_id = Column(Integer, ForeignKey("words.id"), nullable=False)
+    whisper_heard = Column(String, nullable=False)
+    score = Column(Integer, nullable=False)
+    is_correct = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 #== Story model to store stories created by parents and answered by children ==
 class Story(Base):
     __tablename__ = "stories"

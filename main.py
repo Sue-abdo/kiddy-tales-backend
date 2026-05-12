@@ -155,14 +155,14 @@ def verify_email(email: str, code: str, db: Session = Depends(database.get_db)):
 
 @app.post("/login", tags=["Auth"])
 def login(user_credentials: schemas.UserLogin, db: Session = Depends(database.get_db)):
+    # ابحثي بـ child_email بدل email
     user = db.query(models.User).filter(
-        models.User.email == user_credentials.email
+        models.User.child_email == user_credentials.email
     ).first()
 
     if not user or not verify_password(user_credentials.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid Credentials")
 
-    # تأكدي إن الـ email متأكد منه
     if not user.is_verified:
         raise HTTPException(
             status_code=403,
@@ -170,14 +170,14 @@ def login(user_credentials: schemas.UserLogin, db: Session = Depends(database.ge
         )
 
     access_token = create_access_token(
-        data={"sub": user.email, "user_name": user.name}
+        data={"sub": user.child_email, "user_name": user.child_name}
     )
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user_name": user.name,
         "child_name": user.child_name
     }
+
 
 @app.post("/resend-code", tags=["Auth"])
 def resend_code(email: str, db: Session = Depends(database.get_db)):
@@ -268,16 +268,18 @@ def get_current_user(token: str, db: Session) -> models.User:
 # ════════════════════════════════
 
 def get_current_user(token: str, db: Session) -> models.User:
-    """Get user from token automatically"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        user = db.query(models.User).filter(models.User.email == email).first()
+        child_email: str = payload.get("sub")
+        user = db.query(models.User).filter(
+            models.User.child_email == child_email
+        ).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user
     except:
         raise HTTPException(status_code=401, detail="Invalid token")
+
 
 # ════════════════════════════════
 #        WORDS ENDPOINTS
@@ -427,13 +429,12 @@ def compare_pronunciation(whisper_text: str, correct_word: str):
 async def evaluate(
     word_id: int = Form(...),
     audio: UploadFile = File(...),
+    token: str = Form(...),          # ← أضيفي token
     db: Session = Depends(database.get_db)
 ):
-    """
-    Send child audio + word_id → get score and feedback
-    Input:  word_id (int) + audio (file)
-    Output: score, feedback, is_correct, whisper_heard
-    """
+    # جيبي الـ user من الـ token
+    user = get_current_user(token, db)
+
     word = db.query(models.Word).filter(models.Word.id == word_id).first()
     if not word:
         raise HTTPException(status_code=404, detail=f"Word '{word_id}' not found")
@@ -448,6 +449,18 @@ async def evaluate(
         result = whisper_model.transcribe(tmp_path)
         whisper_text = result["text"]
         evaluation = compare_pronunciation(whisper_text, word.word)
+
+        # حفظ النتيجة مربوطة بالطفل
+        pronunciation_result = models.PronunciationResult(
+            user_id=user.id,
+            word_id=word_id,
+            whisper_heard=whisper_text.strip(),
+            score=evaluation["score"],
+            is_correct=evaluation["is_correct"]
+        )
+        db.add(pronunciation_result)
+        db.commit()
+
         return {
             "word_id": word_id,
             "correct_word": word.word,
@@ -457,19 +470,16 @@ async def evaluate(
     finally:
         os.unlink(tmp_path)
 
-
 @app.post("/practice/{word_id}", response_model=schemas.EvaluateResponse, tags=["AI"])
 async def practice_word(
     word_id: int,
     audio: UploadFile = File(...),
+    token: str = Form(...),          # ← أضيفي token
     db: Session = Depends(database.get_db)
 ):
-    """
-    Full listening + speaking flow:
-    Step 1: Flutter called GET /words/{id}/audio → child heard the word
-    Step 2: Child recorded their voice
-    Step 3: Send recording here → get score + feedback
-    """
+    # جيبي الـ user من الـ token
+    user = get_current_user(token, db)
+
     word = db.query(models.Word).filter(models.Word.id == word_id).first()
     if not word:
         raise HTTPException(status_code=404, detail="Word not found")
@@ -484,6 +494,18 @@ async def practice_word(
         result = whisper_model.transcribe(tmp_path)
         whisper_text = result["text"]
         evaluation = compare_pronunciation(whisper_text, word.word)
+
+        # حفظ النتيجة مربوطة بالطفل
+        pronunciation_result = models.PronunciationResult(
+            user_id=user.id,
+            word_id=word_id,
+            whisper_heard=whisper_text.strip(),
+            score=evaluation["score"],
+            is_correct=evaluation["is_correct"]
+        )
+        db.add(pronunciation_result)
+        db.commit()
+
         return {
             "word_id": word_id,
             "correct_word": word.word,
@@ -492,7 +514,6 @@ async def practice_word(
         }
     finally:
         os.unlink(tmp_path)
-
 # ════════════════════════════════
 #     STORY + IMAGE ENDPOINT
 # ════════════════════════════════
@@ -702,8 +723,29 @@ async def evaluate_answers(
         "results": results
     }
 
+@app.get("/progress", response_model=schemas.ProgressResponse, tags=["AI"])
+def get_progress(token: str, db: Session = Depends(database.get_db)):
+    """Get child's pronunciation progress"""
+    user = get_current_user(token, db)
+
+    results = db.query(models.PronunciationResult).filter(
+        models.PronunciationResult.user_id == user.id
+    ).all()
+
+    total = len(results)
+    correct = sum(1 for r in results if r.is_correct)
+    rate = round((correct / total) * 100, 1) if total > 0 else 0
+
+    return {
+        "child_name": user.child_name,
+        "total_attempts": total,
+        "correct_attempts": correct,
+        "success_rate": rate,
+        "results": results
+    }
 # ════════════════════════════════
 #        RUN SERVER
 # ════════════════════════════════
 if __name__ == "__main__":
     uvicorn.run(app, host="192.168.138.127", port=8000)
+
