@@ -41,11 +41,18 @@ BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
 #        APP SETUP
 # ════════════════════════════════
 app = FastAPI(
-    title="KidsApp API",
+    title="Kiddy Tales API",
     description="AI-powered English learning app for kids aged 6-11",
     version="1.0.0"
 )
-
+@app.get("/", tags=["Root"])
+def root():
+    return {
+        "app": "Kiddy Tales",
+        "status": "running",
+        "docs": "/docs",
+        "version": "1.0.0"
+    }
 # Static folder for audio files
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
