@@ -1,5 +1,5 @@
 ---
-title: English Buddy Backend
+title: Kiddy Tales Backend
 emoji: 📚
 colorFrom: blue
 colorTo: green
@@ -54,7 +54,7 @@ Kiddy Tales is an AI-powered mobile application designed to improve English lang
 - `POST /evaluate-answers` — Submit answers → get score + feedback
 
 ## Live API
-- **Swagger Docs:** https://sue-ii99-english-buddy-backend.hf.space/docs
+- **Swagger Docs:** https://sue-ii99-kiddy-tales-backend.hf.space/docs
 
 ## Supervised by
-Dr. Bhaa — Ahram Canadian University, Egypt 2026
+Dr. Bahaa  — Ahram Canadian University, Egypt 2026
