@@ -177,3 +177,66 @@ class AnswersEvaluationResponse(BaseModel):
     child_feedback: str
     parent_feedback: str
     results: List[AnswerResult]
+
+# ════════════════════════════════
+#   READING SCHEMAS
+# ════════════════════════════════
+
+class PassageCreate(BaseModel):
+    title: str
+    content: str
+    level: int
+
+    @field_validator('level')
+    @classmethod
+    def validate_level(cls, v):
+        if v not in [1, 2, 3]:
+            raise ValueError('Level must be 1, 2, or 3')
+        return v
+
+
+class PassageResponse(BaseModel):
+    id: int
+    title: str
+    content: str
+    level: int
+    audio_url: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PassagesListResponse(BaseModel):
+    passages: List[PassageResponse]
+
+
+class ReadingEvaluateResponse(BaseModel):
+    passage_id: int
+    score: int
+    total_words: int
+    correct_words: int
+    missed_words: List[str]
+    whisper_transcript: str
+    feedback: str
+    is_passed: bool          # True if score >= 60%
+
+
+class ReadingResultResponse(BaseModel):
+    id: int
+    passage_id: int
+    whisper_transcript: str
+    score: int
+    missed_words: str
+    feedback: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReadingProgressResponse(BaseModel):
+    child_name: str
+    total_attempts: int
+    average_score: float
+    results: List[ReadingResultResponse]
