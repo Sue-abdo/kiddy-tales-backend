@@ -85,3 +85,32 @@ class StoryResult(Base):
     child_feedback = Column(Text, nullable=True)
     parent_feedback = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+# == Reading Passage model to store reading texts for children ==
+class ReadingPassage(Base):
+    __tablename__ = "reading_passages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    level = Column(Integer, nullable=False)
+    audio_url = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    results = relationship("ReadingResult", back_populates="passage")
+
+
+# == ReadingResult model to store each child's reading attempt ==
+class ReadingResult(Base):
+    __tablename__ = "reading_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    passage_id = Column(Integer, ForeignKey("reading_passages.id"), nullable=False)
+    whisper_transcript = Column(Text, nullable=False)
+    score = Column(Integer, nullable=False)
+    missed_words = Column(String, nullable=True)
+    feedback = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    passage = relationship("ReadingPassage", back_populates="results")

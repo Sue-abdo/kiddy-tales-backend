@@ -750,6 +750,163 @@ def get_progress(token: str, db: Session = Depends(database.get_db)):
         "success_rate": rate,
         "results": results
     }
+    
+    
+# ════════════════════════════════
+#        READING ENDPOINTS
+# ════════════════════════════════
+
+@app.post("/passages", response_model=schemas.PassageResponse, tags=["Reading"])
+def add_passage(
+    passage: schemas.PassageCreate,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Add a new reading passage.
+    Automatically generates TTS audio so the child can listen first.
+    """
+    # 1. Generate audio for the passage (reusing existing tts_service)
+    safe_title = passage.title.replace(" ", "_")[:20]
+    audio_filename = f"passage_{safe_title}_{uuid.uuid4().hex[:8]}.mp3"
+    audio_path = f"static/{audio_filename}"
+    text_to_speech(passage.content, audio_path)
+    audio_url = f"{BASE_URL}/static/{audio_filename}"
+
+    # 2. Save passage to DB
+    new_passage = models.ReadingPassage(
+        title=passage.title,
+        content=passage.content,
+        level=passage.level,
+        audio_url=audio_url
+    )
+    db.add(new_passage)
+    db.commit()
+    db.refresh(new_passage)
+    return new_passage
+
+
+@app.get("/passages", response_model=schemas.PassagesListResponse, tags=["Reading"])
+def get_passages_by_level(
+    level: int,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get all reading passages for a specific level (1, 2, or 3).
+    Flutter displays the passage text and audio to the child.
+    """
+    passages = db.query(models.ReadingPassage).filter(
+        models.ReadingPassage.level == level
+    ).all()
+
+    if not passages:
+        raise HTTPException(
+            status_code=404,
+            detail="No passages found for this level"
+        )
+    return {"passages": passages}
+
+
+@app.get("/passages/{passage_id}", response_model=schemas.PassageResponse, tags=["Reading"])
+def get_passage(
+    passage_id: int,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get a single reading passage by ID.
+    """
+    passage = db.query(models.ReadingPassage).filter(
+        models.ReadingPassage.id == passage_id
+    ).first()
+
+    if not passage:
+        raise HTTPException(status_code=404, detail="Passage not found")
+    return passage
+
+
+@app.post("/reading/evaluate", response_model=schemas.ReadingEvaluateResponse, tags=["Reading"])
+async def evaluate_reading_attempt(
+    passage_id: int = Form(...),
+    audio: UploadFile = File(...),
+    token: str = Form(...),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Child records themselves reading the passage.
+    Whisper transcribes the audio → word-by-word evaluation →
+    score + missed words + feedback saved and returned.
+    """
+    # 1. Get user from token
+    user = get_current_user(token, db)
+
+    # 2. Get passage from DB
+    passage = db.query(models.ReadingPassage).filter(
+        models.ReadingPassage.id == passage_id
+    ).first()
+    if not passage:
+        raise HTTPException(status_code=404, detail="Passage not found")
+
+    # 3. Save audio to temp file and transcribe with Whisper
+    suffix = os.path.splitext(audio.filename)[-1] or ".wav"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await audio.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        result = whisper_model.transcribe(tmp_path)
+        whisper_transcript = result["text"]
+
+        # 4. Evaluate using our reading_service
+        evaluation = evaluate_reading(passage.content, whisper_transcript)
+
+        # 5. Save result to DB
+        reading_result = models.ReadingResult(
+            user_id=user.id,
+            passage_id=passage_id,
+            whisper_transcript=whisper_transcript.strip(),
+            score=evaluation["score"],
+            missed_words=", ".join(evaluation["missed_words"]),
+            feedback=evaluation["feedback"]
+        )
+        db.add(reading_result)
+        db.commit()
+
+        return {
+            "passage_id": passage_id,
+            "whisper_transcript": whisper_transcript.strip(),
+            **evaluation
+        }
+
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.get("/reading/progress", response_model=schemas.ReadingProgressResponse, tags=["Reading"])
+def get_reading_progress(
+    token: str,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get the child's full reading history:
+    total attempts, average score, and all results.
+    """
+    user = get_current_user(token, db)
+
+    results = db.query(models.ReadingResult).filter(
+        models.ReadingResult.user_id == user.id
+    ).all()
+
+    total = len(results)
+    avg_score = round(
+        sum(r.score for r in results) / total, 1
+    ) if total > 0 else 0.0
+
+    return {
+        "child_name": user.child_name,
+        "total_attempts": total,
+        "average_score": avg_score,
+        "results": results
+    }
 # ════════════════════════════════
 #        RUN SERVER
 # ════════════════════════════════

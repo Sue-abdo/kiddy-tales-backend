@@ -1,0 +1,11 @@
+* [33m90fa7f2[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Add reading endpoints for passages and evaluation
+* [33mc27cbd8[m Implement reading evaluation with Levenshtein distance
+* [33mcaad676[m Add reading schemas for passage and evaluation responses
+* [33m26d83e7[m Add ReadingPassage and ReadingResult models
+[31m|[m * [33m9721d7a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31mhuggingface/main[m[33m)[m add root endpoint
+[31m|[m[31m/[m  
+* [33md803fef[m save local changes
+* [33me7f9048[m save local changes
+* [33m53a3554[m Update project title in README.md
+* [33m02f4e6d[m login with child email, link results to child
+* [33md8e559e[m login with child email, link results to child
