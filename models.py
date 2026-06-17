@@ -114,3 +114,18 @@ class ReadingResult(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     passage = relationship("ReadingPassage", back_populates="results")
+
+# == ReadingQuestion model for multiple choice questions ==
+class ReadingQuestion(Base):
+    __tablename__ = "reading_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    passage_id = Column(Integer, ForeignKey("reading_passages.id"), nullable=False)
+    question_text = Column(String, nullable=False)
+    option_1 = Column(String, nullable=False)
+    option_2 = Column(String, nullable=False)
+    option_3 = Column(String, nullable=False)
+    correct_answer = Column(String, nullable=False)  # "Option_1", "Option_2", or "Option_3"
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    passage = relationship("ReadingPassage", back_populates="questions")
