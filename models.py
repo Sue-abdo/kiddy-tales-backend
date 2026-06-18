@@ -98,8 +98,8 @@ class ReadingPassage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     results = relationship("ReadingResult", back_populates="passage")
-
-
+    questions = relationship("ReadingQuestion", back_populates="passage")
+    
 # == ReadingResult model to store each child's reading attempt ==
 class ReadingResult(Base):
     __tablename__ = "reading_results"
