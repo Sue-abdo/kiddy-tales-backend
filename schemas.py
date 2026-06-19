@@ -232,3 +232,30 @@ class SubmitReadingAnswersResponse(BaseModel):
     child_feedback: str
     parent_feedback: str
     results: List[ReadingAnswerResult]
+
+# ════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
+
+class StoryImageResponse(BaseModel):
+    id: int
+    image_url: str
+    image_order: int
+
+    class Config:
+        from_attributes = True
+
+
+class FullPassageResponse(BaseModel):
+    """
+    The ONE combined response Flutter needs to render a reading screen:
+    story text + all images + all questions (no audio_url — TTS not used here)
+    """
+    id: int
+    title: str
+    content: str
+    level: int
+    images: List[StoryImageResponse]
+    questions: List[ReadingQuestionResponse]
+
+    class Config:
+        from_attributes = True
