@@ -94,7 +94,6 @@ class ReadingPassage(Base):
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     level = Column(Integer, nullable=False)
-    audio_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     results = relationship("ReadingResult", back_populates="passage")
