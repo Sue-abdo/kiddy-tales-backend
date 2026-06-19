@@ -50,7 +50,12 @@ class UserUpdate(BaseModel):
     child_age: Optional[int] = None
     parent_email: Optional[str] = None
     password: Optional[str] = None
-
+    @field_validator('child_age')
+    @classmethod
+    def validate_age(cls, v):
+        if v is not None and not (6 <= v <= 11):
+            raise ValueError('Child age must be between 6 and 11')
+        return v
 
 # ════════════════════════════════
 #        WORD SCHEMAS
@@ -156,8 +161,7 @@ class QuestionAnswer(BaseModel):
 
 
 class AnswersRequest(BaseModel):
-    story_id: int
-    token: str          # ← بدل user_id
+    story_id: int       # ← بدل user_id
     answers: List[QuestionAnswer]
 
 class AnswerResult(BaseModel):
