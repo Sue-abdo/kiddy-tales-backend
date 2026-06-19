@@ -900,7 +900,155 @@ def get_reading_progress(
         "average_score": avg_score,
         "results": results
     }
-    
+
+# ════════════════════════════════
+#        READING QUESTIONS ENDPOINTS
+# ════════════════════════════════
+
+@app.get("/passages/{passage_id}/questions",
+         response_model=schemas.ReadingQuestionsListResponse,
+         tags=["Reading"])
+def get_passage_questions(
+    passage_id: int,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get the 3 multiple choice questions for a specific passage.
+    Flutter shows these questions after the child finishes reading.
+    Correct answer is NOT included in response — only shown after submission.
+    """
+    passage = db.query(models.ReadingPassage).filter(
+        models.ReadingPassage.id == passage_id
+    ).first()
+
+    if not passage:
+        raise HTTPException(status_code=404, detail="Passage not found")
+
+    questions = db.query(models.ReadingQuestion).filter(
+        models.ReadingQuestion.passage_id == passage_id
+    ).all()
+
+    if not questions:
+        raise HTTPException(
+            status_code=404,
+            detail="No questions found for this passage"
+        )
+
+    return {
+        "passage_id": passage_id,
+        "questions": questions
+    }
+
+
+@app.post("/reading/submit-answers",
+          response_model=schemas.SubmitReadingAnswersResponse,
+          tags=["Reading"])
+def submit_reading_answers(
+    request: schemas.SubmitReadingAnswersRequest,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Child submits their multiple choice answers.
+    System checks each answer, calculates score,
+    generates feedback for child and parent,
+    saves result to database.
+    """
+    # 1. Get user from token
+    user = get_current_user(request.token, db)
+
+    # 2. Verify passage exists
+    passage = db.query(models.ReadingPassage).filter(
+        models.ReadingPassage.id == request.passage_id
+    ).first()
+    if not passage:
+        raise HTTPException(status_code=404, detail="Passage not found")
+
+    # 3. Evaluate each answer
+    results = []
+    correct_count = 0
+    total = len(request.answers)
+
+    for item in request.answers:
+        question = db.query(models.ReadingQuestion).filter(
+            models.ReadingQuestion.id == item.question_id
+        ).first()
+        if not question:
+            continue
+
+        is_correct = item.selected_option == question.correct_answer
+
+        if is_correct:
+            correct_count += 1
+            feedback = "Correct! Well done! 🌟"
+        else:
+            # Get the correct option text to show in feedback
+            correct_text = getattr(
+                question,
+                question.correct_answer.lower()
+            )
+            feedback = f"The correct answer is: '{correct_text}' 💪"
+
+        results.append({
+            "question_id": item.question_id,
+            "question_text": question.question_text,
+            "selected_option": item.selected_option,
+            "correct_answer": question.correct_answer,
+            "is_correct": is_correct,
+            "feedback": feedback
+        })
+
+    # 4. Calculate final score
+    score = round((correct_count / total) * 100) if total > 0 else 0
+    child_name = user.child_name or "Your child"
+
+    # 5. Generate feedback messages
+    if score == 100:
+        child_feedback = "Amazing! You answered all questions correctly! 🏆⭐"
+        parent_feedback = (
+            f"Excellent! {child_name} answered all {total} questions "
+            f"correctly. Score: {score}/100!"
+        )
+    elif score >= 60:
+        child_feedback = (
+            f"Good job! You got {correct_count} out of {total} correct! 👍"
+        )
+        parent_feedback = (
+            f"Good progress! {child_name} answered {correct_count}/{total} "
+            f"correctly. Score: {score}/100. "
+            f"Review the incorrect answers together."
+        )
+    else:
+        child_feedback = (
+            f"Keep practicing! You got {correct_count} out of {total}. "
+            f"Try reading the story again! 💪"
+        )
+        parent_feedback = (
+            f"{child_name} needs more practice. Score: {score}/100. "
+            f"We recommend re-reading the story and trying again."
+        )
+
+    # 6. Save result to DB
+    reading_result = models.ReadingResult(
+        user_id=user.id,
+        passage_id=request.passage_id,
+        whisper_transcript="N/A",
+        score=score,
+        missed_words="",
+        feedback=child_feedback
+    )
+    db.add(reading_result)
+    db.commit()
+
+    return {
+        "passage_id": request.passage_id,
+        "total_questions": total,
+        "correct_answers": correct_count,
+        "score": score,
+        "child_feedback": child_feedback,
+        "parent_feedback": parent_feedback,
+        "results": results
+    }
+
 # ════════════════════════════════
 #        RUN SERVER
 # ════════════════════════════════

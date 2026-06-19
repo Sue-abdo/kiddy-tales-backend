@@ -182,3 +182,53 @@ class AnswersEvaluationResponse(BaseModel):
     parent_feedback: str
     results: List[AnswerResult]
     
+
+# ════════════════════════════════
+#   READING QUESTIONS SCHEMAS
+# ════════════════════════════════
+
+class ReadingQuestionResponse(BaseModel):
+    id: int
+    passage_id: int
+    question_text: str
+    option_1: str
+    option_2: str
+    option_3: str
+
+    class Config:
+        from_attributes = True
+
+
+class ReadingQuestionsListResponse(BaseModel):
+    passage_id: int
+    questions: List[ReadingQuestionResponse]
+
+
+class SubmitReadingAnswer(BaseModel):
+    question_id: int
+    selected_option: str    # "Option_1", "Option_2", or "Option_3"
+
+
+class SubmitReadingAnswersRequest(BaseModel):
+    passage_id: int
+    token: str
+    answers: List[SubmitReadingAnswer]
+
+
+class ReadingAnswerResult(BaseModel):
+    question_id: int
+    question_text: str
+    selected_option: str
+    correct_answer: str
+    is_correct: bool
+    feedback: str
+
+
+class SubmitReadingAnswersResponse(BaseModel):
+    passage_id: int
+    total_questions: int
+    correct_answers: int
+    score: int
+    child_feedback: str
+    parent_feedback: str
+    results: List[ReadingAnswerResult]
