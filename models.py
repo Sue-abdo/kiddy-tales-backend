@@ -99,7 +99,8 @@ class ReadingPassage(Base):
 
     results = relationship("ReadingResult", back_populates="passage")
     questions = relationship("ReadingQuestion", back_populates="passage")
-    
+    images = relationship("StoryImage", back_populates="passage")
+
 # == ReadingResult model to store each child's reading attempt ==
 class ReadingResult(Base):
     __tablename__ = "reading_results"
@@ -129,3 +130,14 @@ class ReadingQuestion(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     passage = relationship("ReadingPassage", back_populates="questions")
+
+# == StoryImage model for images attached to each reading passage ==
+class StoryImage(Base):
+    __tablename__ = "story_images"
+ 
+    id = Column(Integer, primary_key=True, index=True)
+    passage_id = Column(Integer, ForeignKey("reading_passages.id"), nullable=False)
+    image_url = Column(String, nullable=False)
+    image_order = Column(Integer, default=1)  # 1st, 2nd, 3rd image for this story
+ 
+    passage = relationship("ReadingPassage", back_populates="images")   
