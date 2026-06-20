@@ -2,7 +2,6 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 
-
 # ════════════════════════════════
 #        USER SCHEMAS
 # ════════════════════════════════
@@ -32,7 +31,6 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-
 class UserProfileResponse(BaseModel):
     id: int
     name: str
@@ -43,7 +41,6 @@ class UserProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -64,7 +61,6 @@ class WordCreate(BaseModel):
     word: str
     level: int
 
-
 class WordResponse(BaseModel):
     id: int
     word: str
@@ -78,14 +74,12 @@ class WordResponse(BaseModel):
 class WordsListResponse(BaseModel):
     words: List[WordResponse]
 
-
 # ════════════════════════════════
 #        AI — Evaluate SCHEMAS
 # ════════════════════════════════
 class AudioResponse(BaseModel):
     word: str
     sound_url: str
-
 
 class EvaluateResponse(BaseModel):
     word_id: int
@@ -123,7 +117,6 @@ class CorrectionItem(BaseModel):
     wrong: str
     right: str
 
-
 # 2
 class StoryQuestionResponse(BaseModel):
     id: int
@@ -132,7 +125,6 @@ class StoryQuestionResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 # 3 — بعد CorrectionItem و StoryQuestionResponse
 class StoryResponse(BaseModel):
@@ -151,14 +143,12 @@ class StoryResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 # ════════════════════════════════
 #   ANSWERS SCHEMAS
 # ════════════════════════════════
 class QuestionAnswer(BaseModel):
     question_id: int
     child_answer: str
-
 
 class AnswersRequest(BaseModel):
     story_id: int       # ← بدل user_id
@@ -171,7 +161,6 @@ class AnswerResult(BaseModel):
     correct_answer: str
     is_correct: bool
     feedback: str
-
 
 class AnswersEvaluationResponse(BaseModel):
     story_id: int
