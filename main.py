@@ -99,60 +99,23 @@ def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
             detail="This child email is already registered"
         )
 
-    # 2. عملي verification code
-    code = generate_verification_code()
-
     # 3. حفظي الـ user مع الكود
     new_user = models.User(
-        name=user.name,
         child_name=user.child_name,
         email=user.email,
         child_email=user.child_email,
         hashed_password=hash_password(user.password),
         child_age=user.child_age,
-        is_verified=False,
-        verification_code=code
     )
     db.add(new_user)
     db.commit()
+    db.refresh(new_user)
 
-    # 4. ابعتي الكود على الـ email
-    sent = send_verification_email(user.email, code, user.child_name)
-
-    if sent:
-        return {
-            "message": f"Verification code sent to {user.email}. Please verify your email.",
-            "email": user.email
-        }
-    else:
-        return {
-            "message": "Account created but email could not be sent. Contact support.",
-            "email": user.email
-        }
-
-@app.post("/verify-email", tags=["Auth"])
-def verify_email(email: str, code: str, db: Session = Depends(database.get_db)):
-    """Parent enters the 6-digit code they received"""
-    user = db.query(models.User).filter(
-        models.User.email == email,
-        models.User.verification_code == code
-    ).first()
-
-    if not user:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid email or verification code"
-        )
-
-    if user.is_verified:
-        return {"message": "Email already verified!"}
-
-    # تأكيد الـ email
-    user.is_verified = True
-    user.verification_code = None
-    db.commit()
-
-    return {"message": "Email verified successfully! You can now login. ✅"}
+    return {
+        "message": "Account created successfully",
+        "child_email": new_user.child_email,
+        "child_name": new_user.child_name
+    }
 
 @app.post("/login", tags=["Auth"])
 def login(user_credentials: schemas.UserLogin, db: Session = Depends(database.get_db)):
@@ -164,12 +127,6 @@ def login(user_credentials: schemas.UserLogin, db: Session = Depends(database.ge
     if not user or not verify_password(user_credentials.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid Credentials")
 
-    if not user.is_verified:
-        raise HTTPException(
-            status_code=403,
-            detail="Please verify your email first. Check your inbox."
-        )
-
     access_token = create_access_token(
         data={"sub": user.child_email, "user_name": user.child_name}
     )
@@ -180,35 +137,13 @@ def login(user_credentials: schemas.UserLogin, db: Session = Depends(database.ge
     }
 
 
-@app.post("/resend-code", tags=["Auth"])
-def resend_code(email: str, db: Session = Depends(database.get_db)):
-    """Resend verification code"""
-    user = db.query(models.User).filter(
-        models.User.email == email
-    ).first()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="Email not found")
-
-    if user.is_verified:
-        return {"message": "Email already verified!"}
-
-    # عملي كود جديد
-    new_code = generate_verification_code()
-    user.verification_code = new_code
-    db.commit()
-
-    send_verification_email(email, new_code, user.child_name)
-    return {"message": f"New verification code sent to {email}"}
-
 
 @app.get("/profile", response_model=schemas.UserProfileResponse, tags=["Auth"])
 def get_my_profile(token: str, db: Session = Depends(database.get_db)):
-    """Get parent profile using token"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        user = db.query(models.User).filter(models.User.email == email).first()
+        child_email: str = payload.get("sub")
+        user = db.query(models.User).filter(models.User.child_email == child_email).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user
@@ -222,21 +157,18 @@ def update_my_profile(
     user_data: schemas.UserUpdate,
     db: Session = Depends(database.get_db)
 ):
-    """Update parent profile"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        db_user = db.query(models.User).filter(models.User.email == email).first()
+        child_email: str = payload.get("sub")
+        db_user = db.query(models.User).filter(models.User.child_email == child_email).first()
 
         if not db_user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        if user_data.name:
-            db_user.name = user_data.name
         if user_data.child_age is not None:
             db_user.child_age = user_data.child_age
         if user_data.parent_email:
-            db_user.parent_email = user_data.parent_email
+            db_user.email = user_data.parent_email
         if user_data.password:
             db_user.hashed_password = hash_password(user_data.password)
 
@@ -245,7 +177,6 @@ def update_my_profile(
         return db_user
     except:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
-
 
 @app.post("/logout", tags=["Auth"])
 def sign_out():

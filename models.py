@@ -7,17 +7,12 @@ from database import Base
 #== User model to store parent and child information ===
 class User(Base):
     __tablename__ = "users"
-
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
     child_name = Column(String, nullable=False)
     child_age = Column(Integer, nullable=False)
     email = Column(String, nullable=False)         # ← مش unique عشان parent ممكن يسجل أكتر من طفل
     child_email = Column(String, unique=True, nullable=False)  # ← unique
     hashed_password = Column(String, nullable=False)
-    is_verified = Column(Boolean, default=False)   # ← اتأكد من الـ email ولا لسه
-    verification_code = Column(String, nullable=True)  # ← الكود المؤقت
-
 
 #== Word model to store words for different levels ==
 class Word(Base):

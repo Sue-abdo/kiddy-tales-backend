@@ -6,7 +6,7 @@ from datetime import datetime
 #        USER SCHEMAS
 # ════════════════════════════════
 class UserCreate(BaseModel):
-    name: str
+    
     child_name: str
     email: EmailStr                    # ← validation أوتوماتيك
     child_email: EmailStr              # ← validation أوتوماتيك
@@ -33,7 +33,6 @@ class UserLogin(BaseModel):
 
 class UserProfileResponse(BaseModel):
     id: int
-    name: str
     child_name: Optional[str] = None
     email: str
     child_email: Optional[str] = None
@@ -43,7 +42,7 @@ class UserProfileResponse(BaseModel):
         from_attributes = True
 
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
+
     child_age: Optional[int] = None
     parent_email: Optional[str] = None
     password: Optional[str] = None
