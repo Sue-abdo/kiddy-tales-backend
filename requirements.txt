@@ -20,5 +20,6 @@ groq
 fastapi-mail
 google-genai
 Pillow  
+Levenshtein
 #pip install -r requirements.txt
 #python -m uvicorn main:app --reload

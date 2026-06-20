@@ -34,6 +34,22 @@ Kiddy Tales is an AI-powered mobile application designed to improve English lang
 | Auth | JWT Tokens |
 | Deployment | Hugging Face Spaces |
 
+## Setup
+Create a `.env` file in the project root with at least:
+
+```
+GROQ_API_KEY=your_groq_api_key_here
+SECRET_KEY=your_secret_key_here
+BASE_URL=http://127.0.0.1:8000
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+```
+
+Then start the app with:
+
+```
+python -m uvicorn main:app --reload
+```
+
 ## API Endpoints
 ### Auth
 - `POST /signup` — Register parent + child account
