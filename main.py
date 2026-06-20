@@ -1049,6 +1049,49 @@ def submit_reading_answers(
         "results": results
     }
 
+# ════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
+
+@app.get("/passages/{passage_id}/full",
+         response_model=schemas.FullPassageResponse,
+         tags=["Reading"])
+def get_full_passage(
+    passage_id: int,
+    db: Session = Depends(database.get_db)
+):
+    """
+    ONE combined endpoint for Flutter's reading screen.
+    Returns everything needed in a single call:
+      - story title + text
+      - all images for this story (in order)
+      - all 3 multiple choice questions (correct_answer hidden)
+
+    No audio_url, no TTS — this feature is text + images + questions only.
+    """
+    passage = db.query(models.ReadingPassage).filter(
+        models.ReadingPassage.id == passage_id
+    ).first()
+
+    if not passage:
+        raise HTTPException(status_code=404, detail="Passage not found")
+
+    images = db.query(models.StoryImage).filter(
+        models.StoryImage.passage_id == passage_id
+    ).order_by(models.StoryImage.image_order).all()
+
+    questions = db.query(models.ReadingQuestion).filter(
+        models.ReadingQuestion.passage_id == passage_id
+    ).all()
+
+    return {
+        "id": passage.id,
+        "title": passage.title,
+        "content": passage.content,
+        "level": passage.level,
+        "images": images,
+        "questions": questions
+    }
+
 # ════════════════════════════════
 #        RUN SERVER
 # ════════════════════════════════

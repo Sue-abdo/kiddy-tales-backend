@@ -5,7 +5,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = None
+
+def get_groq_client():
+    global client
+    if client is None:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "GROQ_API_KEY environment variable is required. "
+                "Set it in your environment or in a .env file."
+            )
+        client = Groq(api_key=api_key)
+    return client
 
 
 def correct_words(words: str) -> dict:
@@ -36,6 +48,7 @@ Return ONLY this JSON, no extra text:
 If no mistakes, was_corrected = false and corrected = original.
 """
 
+    client = get_groq_client()
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
@@ -88,6 +101,7 @@ Return ONLY this JSON format, no extra text:
 }}
 """
 
+    client = get_groq_client()
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
