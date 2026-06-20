@@ -4,7 +4,6 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from jose import jwt
-from email_service import generate_verification_code, send_verification_email
 import bcrypt
 import uvicorn
 import models, schemas, database
@@ -25,9 +24,8 @@ load_dotenv()
 # ════════════════════════════════
 #        Story & Image Services
 # ════════════════════════════════
-from story_service import generate_story_and_questions, correct_words
+from story_service import correct_words
 from image_service import generate_image
-from fastapi.responses import FileResponse
 from typing import List, Optional
 
 # ════════════════════════════════
@@ -450,26 +448,23 @@ async def practice_word(
 #     STORY + IMAGE ENDPOINT
 # ════════════════════════════════
 
+
 @app.post("/generate-story", response_model=schemas.StoryResponse, tags=["AI"])
-async def generate_story(
+async def generate_story_endpoint(
     words: str = Form(...),
-    token: str = Form(...),        # ← token بدل user_id
+    token: str = Form(...),
     db: Session = Depends(database.get_db)
 ):
-    # 1. جيبي الـ user من الـ token أوتوماتيك
     user = get_current_user(token, db)
 
     try:
-        # 2. تصحيح الإملاء
         correction = correct_words(words)
         corrected = correction["corrected"]
         was_corrected = correction["was_corrected"]
         corrections = correction.get("corrections", [])
 
-        # 3. توليد القصة
-        result = generate_story_and_questions(corrected)
+        result = generate_story(corrected)
 
-        # 4. توليد الصورة
         safe_name = corrected.replace(" ", "_")[:20]
         image_filename = f"story_{safe_name}_{uuid.uuid4().hex[:8]}.png"
         image_path = f"static/{image_filename}"
@@ -480,13 +475,11 @@ async def generate_story(
         except Exception:
             image_url = f"{BASE_URL}/static/default.png"
 
-        # 5. توليد audio للقصة عشان الطفل يسمعها
         story_audio_filename = f"story_audio_{uuid.uuid4().hex[:8]}.mp3"
         story_audio_path = f"static/{story_audio_filename}"
         text_to_speech(result["story"], story_audio_path)
         story_audio_url = f"{BASE_URL}/static/{story_audio_filename}"
 
-        # 6. feedback للـ parent
         child_name = user.child_name or "Your child"
         if was_corrected and corrections:
             mistakes = ", ".join(
@@ -503,7 +496,6 @@ async def generate_story(
                 f"with no spelling mistakes!"
             )
 
-        # 7. حفظ في الـ DB
         new_story = models.Story(
             user_id=user.id,
             original_words=words,
@@ -515,20 +507,6 @@ async def generate_story(
             parent_feedback=parent_feedback
         )
         db.add(new_story)
-        db.flush()
-
-        # 8. حفظ الأسئلة
-        saved_questions = []
-        for q in result["questions"]:
-            new_q = models.StoryQuestion(
-                story_id=new_story.id,
-                question=q["question"],
-                correct_answer=q["answer"]
-            )
-            db.add(new_q)
-            db.flush()
-            saved_questions.append(new_q)
-
         db.commit()
         db.refresh(new_story)
 
@@ -541,141 +519,61 @@ async def generate_story(
             "story": result["story"],
             "story_audio_url": story_audio_url,
             "image_url": image_url,
-            "questions": saved_questions,
             "parent_feedback": parent_feedback,
             "created_at": new_story.created_at
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
-@app.post("/evaluate-answers", response_model=schemas.AnswersEvaluationResponse, tags=["AI"])
-async def evaluate_answers(
-    request: schemas.AnswersRequest,
+@app.post("/story/evaluate/{story_id}", response_model=schemas.StoryReadingEvaluateResponse, tags=["AI"])
+async def evaluate_story_reading(
+    story_id: int,
+    audio: UploadFile = File(...),
+    token: str = Form(...),
     db: Session = Depends(database.get_db)
 ):
-    # جيبي الـ user من الـ token
-    user = get_current_user(request.token, db)
+    user = get_current_user(token, db)
 
-    story = db.query(models.Story).filter(
-        models.Story.id == request.story_id
-    ).first()
+    story = db.query(models.Story).filter(models.Story.id == story_id).first()
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
 
-    results = []
-    correct_count = 0
-    total = len(request.answers)
+    temp_path = f"temp_story_{user.id}_{story_id}.wav"
+    with open(temp_path, "wb") as f:
+        f.write(await audio.read())
 
-    for item in request.answers:
-        question = db.query(models.StoryQuestion).filter(
-            models.StoryQuestion.id == item.question_id
-        ).first()
-        if not question:
-            continue
+    whisper_result = whisper_model.transcribe(temp_path)  # ⚠️ غيّر "whisper_model" لاسم المتغير الفعلي عندك
+    transcript = whisper_result["text"]
+    os.remove(temp_path)
 
-        child_clean = item.child_answer.strip().lower()
-        correct_clean = question.correct_answer.strip().lower()
-
-        max_len = max(len(child_clean), len(correct_clean))
-        if max_len == 0:
-            similarity = 100
-        else:
-            distance = Levenshtein.distance(child_clean, correct_clean)
-            similarity = round((1 - distance / max_len) * 100)
-
-        is_correct = similarity >= 60
-
-        if is_correct:
-            correct_count += 1
-            feedback = "Great answer! Well done! 🌟"
-        elif similarity >= 40:
-            feedback = f"Almost! The answer is '{question.correct_answer}' 😊"
-        else:
-            feedback = f"The correct answer is '{question.correct_answer}' 💪"
-
-        child_answer = models.ChildAnswer(
-            question_id=item.question_id,
-            child_answer=item.child_answer,
-            is_correct=is_correct,
-            score=similarity
-        )
-        db.add(child_answer)
-
-        results.append({
-            "question_id": item.question_id,
-            "question": question.question,
-            "child_answer": item.child_answer,
-            "correct_answer": question.correct_answer,
-            "is_correct": is_correct,
-            "feedback": feedback
-        })
-
-    score = round((correct_count / total) * 100) if total > 0 else 0
-    child_name = user.child_name or "Your child"
-
-    if score == 100:
-        child_feedback = "Amazing! You answered everything correctly! 🏆⭐"
-        parent_feedback = (
-            f"Excellent! {child_name} answered all {total} questions correctly. "
-            f"Score: {score}/100!"
-        )
-    elif score >= 60:
-        child_feedback = f"Good job! You got {correct_count} out of {total} correct! 👍"
-        parent_feedback = (
-            f"Good progress! {child_name} answered {correct_count}/{total} correctly. "
-            f"Score: {score}/100. Review the incorrect answers together."
-        )
-    else:
-        child_feedback = f"Keep practicing! You got {correct_count} out of {total}. You can do it! 💪"
-        parent_feedback = (
-            f"{child_name} needs more practice. Score: {score}/100. "
-            f"We recommend re-reading the story and trying again."
-        )
+    evaluation = evaluate_reading(story.story_text, transcript)
 
     story_result = models.StoryResult(
-        story_id=request.story_id,
+        story_id=story_id,
         user_id=user.id,
-        total_questions=total,
-        correct_answers=correct_count,
-        score=score,
-        child_feedback=child_feedback,
-        parent_feedback=parent_feedback
+        whisper_transcript=transcript,
+        score=evaluation["score"],
+        total_words=evaluation["total_words"],
+        correct_words=evaluation["correct_words"],
+        missed_words=", ".join(evaluation["missed_words"]),
+        feedback=evaluation["feedback"],
+        is_passed=evaluation["is_passed"]
     )
     db.add(story_result)
     db.commit()
 
     return {
-        "story_id": request.story_id,
-        "total_questions": total,
-        "correct_answers": correct_count,
-        "score": score,
-        "child_feedback": child_feedback,
-        "parent_feedback": parent_feedback,
-        "results": results
+        "story_id": story_id,
+        "score": evaluation["score"],
+        "total_words": evaluation["total_words"],
+        "correct_words": evaluation["correct_words"],
+        "missed_words": evaluation["missed_words"],
+        "feedback": evaluation["feedback"],
+        "is_passed": evaluation["is_passed"],
+        "whisper_transcript": transcript
     }
-
-@app.get("/progress", response_model=schemas.ProgressResponse, tags=["AI"])
-def get_progress(token: str, db: Session = Depends(database.get_db)):
-    """Get child's pronunciation progress"""
-    user = get_current_user(token, db)
-
-    results = db.query(models.PronunciationResult).filter(
-        models.PronunciationResult.user_id == user.id
-    ).all()
-
-    total = len(results)
-    correct = sum(1 for r in results if r.is_correct)
-    rate = round((correct / total) * 100, 1) if total > 0 else 0
-
-    return {
-        "child_name": user.child_name,
-        "total_attempts": total,
-        "correct_attempts": correct,
-        "success_rate": rate,
-        "results": results
-    }
-
 # ════════════════════════════════
 #        READING ENDPOINTS
 # ════════════════════════════════
@@ -990,21 +888,26 @@ def get_full_passage(
     passage_id: int,
     db: Session = Depends(database.get_db)
 ):
-    """
-    ONE combined endpoint for Flutter's reading screen.
-    Returns everything needed in a single call:
-      - story title + text
-      - all images for this story (in order)
-      - all 3 multiple choice questions (correct_answer hidden)
-
-    No audio_url, no TTS — this feature is text + images + questions only.
-    """
     passage = db.query(models.ReadingPassage).filter(
         models.ReadingPassage.id == passage_id
     ).first()
 
     if not passage:
         raise HTTPException(status_code=404, detail="Passage not found")
+
+    # Most passages already have audio_url from import_stories.py.
+    # This is just a safety net for the few that failed during import,
+    # or for passages added later outside the import script.
+    if not passage.audio_url:
+        try:
+            audio_filename = f"passage_{passage_id}.mp3"
+            audio_path = f"static/{audio_filename}"
+            text_to_speech(passage.content, audio_path)
+            passage.audio_url = f"{BASE_URL}/static/{audio_filename}"
+            db.commit()
+        except Exception as e:
+            print(f"⚠️ Audio generation failed for passage {passage_id}: {e}")
+            # leave audio_url as None — frontend just hides the listen button
 
     images = db.query(models.StoryImage).filter(
         models.StoryImage.passage_id == passage_id
@@ -1019,10 +922,10 @@ def get_full_passage(
         "title": passage.title,
         "content": passage.content,
         "level": passage.level,
+        "audio_url": passage.audio_url,
         "images": images,
         "questions": questions
     }
-
 # ════════════════════════════════
 #        RUN SERVER
 # ════════════════════════════════

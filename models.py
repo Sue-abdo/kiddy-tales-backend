@@ -32,6 +32,8 @@ class PronunciationResult(Base):
     score = Column(Integer, nullable=False)
     is_correct = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+
 #== Story model to store stories created by parents and answered by children ==
 class Story(Base):
     __tablename__ = "stories"
@@ -45,28 +47,8 @@ class Story(Base):
     story_audio_url = Column(String, nullable=True)
     parent_feedback = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    questions = relationship("StoryQuestion", back_populates="story")
 
-#== StoryQuestion model to store questions related to each story ==
-class StoryQuestion(Base):
-    __tablename__ = "story_questions"
-    id = Column(Integer, primary_key=True, index=True)
-    story_id = Column(Integer, ForeignKey("stories.id"), nullable=False)
-    question = Column(String, nullable=False)
-    correct_answer = Column(String, nullable=False)
-    story = relationship("Story", back_populates="questions")
-    child_answer = relationship("ChildAnswer", back_populates="question", uselist=False)
-
-#== ChildAnswer model to store answers provided by children for each question ==
-class ChildAnswer(Base):
-    __tablename__ = "child_answers"
-    id = Column(Integer, primary_key=True, index=True)
-    question_id = Column(Integer, ForeignKey("story_questions.id"), nullable=False)
-    child_answer = Column(String, nullable=False)
-    is_correct = Column(Boolean, default=False)
-    score = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    question = relationship("StoryQuestion", back_populates="child_answer")
+    results = relationship("StoryResult", back_populates="story")
 
 #== StoryResult model to store the results of each story attempt by children ==
 class StoryResult(Base):
@@ -74,12 +56,16 @@ class StoryResult(Base):
     id = Column(Integer, primary_key=True, index=True)
     story_id = Column(Integer, ForeignKey("stories.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    total_questions = Column(Integer, nullable=False)
-    correct_answers = Column(Integer, nullable=False)
+    whisper_transcript = Column(Text, nullable=False)
     score = Column(Integer, nullable=False)
-    child_feedback = Column(Text, nullable=True)
-    parent_feedback = Column(Text, nullable=True)
+    total_words = Column(Integer, nullable=False)
+    correct_words = Column(Integer, nullable=False)
+    missed_words = Column(String, nullable=True)
+    feedback = Column(Text, nullable=True)
+    is_passed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    story = relationship("Story", back_populates="results")
 
 # == Reading Passage model to store reading texts for children ==
 class ReadingPassage(Base):
@@ -96,19 +82,19 @@ class ReadingPassage(Base):
     images = relationship("StoryImage", back_populates="passage")
 
 # == ReadingResult model to store each child's reading attempt ==
-class ReadingResult(Base):
-    __tablename__ = "reading_results"
+class ReadingPassage(Base):
+    __tablename__ = "reading_passages"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    passage_id = Column(Integer, ForeignKey("reading_passages.id"), nullable=False)
-    whisper_transcript = Column(Text, nullable=False)
-    score = Column(Integer, nullable=False)
-    missed_words = Column(String, nullable=True)
-    feedback = Column(Text, nullable=True)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    level = Column(Integer, nullable=False)
+    audio_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    passage = relationship("ReadingPassage", back_populates="results")
+    results = relationship("ReadingResult", back_populates="passage")
+    questions = relationship("ReadingQuestion", back_populates="passage")
+    images = relationship("StoryImage", back_populates="passage")
 
 # == ReadingQuestion model for multiple choice questions ==
 class ReadingQuestion(Base):

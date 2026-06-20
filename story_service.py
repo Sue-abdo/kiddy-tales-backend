@@ -65,10 +65,10 @@ If no mistakes, was_corrected = false and corrected = original.
     return json.loads(text.strip())
 
 
-def generate_story_and_questions(words: str) -> dict:
+def generate_story(words: str) -> dict:
     """
     Takes one word or multiple words from the child
-    Returns: story + image_prompt + questions
+    Returns: story + image_prompt (no questions anymore)
     """
     prompt = f"""
 You are a friendly English teacher for children aged 6-11.
@@ -85,19 +85,10 @@ Please generate:
 2. A simple image description (1 sentence) to illustrate the story.
    This will be used to generate an image. Keep it simple and colorful.
 
-3. Three comprehension questions about the story.
-   - 3 Simple questions [yes/no or short answer]
-   - Suitable for children aged 6-11
-
 Return ONLY this JSON format, no extra text:
 {{
   "story": "the story here",
-  "image_prompt": "colorful children book illustration of ...",
-  "questions": [
-    {{"question": "question 1?", "answer": "answer 1"}},
-    {{"question": "question 2?", "answer": "answer 2"}},
-    {{"question": "question 3?", "answer": "answer 3"}}
-  ]
+  "image_prompt": "colorful children book illustration of ..."
 }}
 """
 
@@ -106,7 +97,7 @@ Return ONLY this JSON format, no extra text:
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
-        max_tokens=1000
+        max_tokens=600
     )
 
     text = response.choices[0].message.content.strip()
@@ -116,7 +107,6 @@ Return ONLY this JSON format, no extra text:
             text = text[4:]
 
     return json.loads(text.strip())
-
 
 # test
 if __name__ == "__main__":

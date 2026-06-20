@@ -42,7 +42,6 @@ class UserProfileResponse(BaseModel):
         from_attributes = True
 
 class UserUpdate(BaseModel):
-
     child_age: Optional[int] = None
     parent_email: Optional[str] = None
     password: Optional[str] = None
@@ -108,24 +107,14 @@ class ProgressResponse(BaseModel):
 
 
 # ════════════════════════════════
-#   STORY SCHEMAS — الترتيب مهم!
+#   STORY SCHEMAS
 # ════════════════════════════════
 
-# 1 — لازم يكون الأول
 class CorrectionItem(BaseModel):
     wrong: str
     right: str
 
-# 2
-class StoryQuestionResponse(BaseModel):
-    id: int
-    question: str
-    correct_answer: str
 
-    class Config:
-        from_attributes = True
-
-# 3 — بعد CorrectionItem و StoryQuestionResponse
 class StoryResponse(BaseModel):
     id: int
     original_words: str
@@ -133,43 +122,28 @@ class StoryResponse(BaseModel):
     was_corrected: bool
     corrections: List[CorrectionItem]
     story: str
-    story_audio_url: str    # ← الطفل يضغط يسمع القصة
+    story_audio_url: str
     image_url: str
-    questions: List[StoryQuestionResponse]
     parent_feedback: str
     created_at: datetime
 
     class Config:
         from_attributes = True
 
+
 # ════════════════════════════════
-#   ANSWERS SCHEMAS
+#   STORY READING EVALUATION
 # ════════════════════════════════
-class QuestionAnswer(BaseModel):
-    question_id: int
-    child_answer: str
 
-class AnswersRequest(BaseModel):
-    story_id: int       # ← بدل user_id
-    answers: List[QuestionAnswer]
-
-class AnswerResult(BaseModel):
-    question_id: int
-    question: str
-    child_answer: str
-    correct_answer: str
-    is_correct: bool
-    feedback: str
-
-class AnswersEvaluationResponse(BaseModel):
+class StoryReadingEvaluateResponse(BaseModel):
     story_id: int
-    total_questions: int
-    correct_answers: int
     score: int
-    child_feedback: str
-    parent_feedback: str
-    results: List[AnswerResult]
-    
+    total_words: int
+    correct_words: int
+    missed_words: List[str]
+    feedback: str
+    is_passed: bool
+    whisper_transcript: str
 
 # ════════════════════════════════
 #   READING QUESTIONS SCHEMAS
@@ -236,12 +210,13 @@ class StoryImageResponse(BaseModel):
 class FullPassageResponse(BaseModel):
     """
     The ONE combined response Flutter needs to render a reading screen:
-    story text + all images + all questions (no audio_url — TTS not used here)
+    story text + audio (TTS, so the child can listen first) + all images + questions
     """
     id: int
     title: str
     content: str
     level: int
+    audio_url:Optional[str]=None
     images: List[StoryImageResponse]
     questions: List[ReadingQuestionResponse]
 
