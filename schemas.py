@@ -43,7 +43,7 @@ class UserProfileResponse(BaseModel):
 
 class UserUpdate(BaseModel):
     child_age: Optional[int] = None
-    parent_email: Optional[str] = None
+    parent_email: Optional[EmailStr] = None
     password: Optional[str] = None
     @field_validator('child_age')
     @classmethod
