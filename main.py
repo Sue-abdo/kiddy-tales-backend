@@ -27,7 +27,7 @@ load_dotenv()
 from story_service import correct_words
 from image_service import generate_image
 from typing import List, Optional
-
+from story_service import generate_story
 # ════════════════════════════════
 #        CONFIG
 # ════════════════════════════════
