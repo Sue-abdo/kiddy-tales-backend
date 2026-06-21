@@ -888,26 +888,21 @@ def get_full_passage(
     passage_id: int,
     db: Session = Depends(database.get_db)
 ):
+    """
+    ONE combined endpoint for Flutter's reading screen.
+    Returns everything needed in a single call:
+      - story title + text
+      - all images for this story (in order)
+      - all 3 multiple choice questions (correct_answer hidden)
+
+    No audio_url, no TTS — this feature is text + images + questions only.
+    """
     passage = db.query(models.ReadingPassage).filter(
         models.ReadingPassage.id == passage_id
     ).first()
 
     if not passage:
         raise HTTPException(status_code=404, detail="Passage not found")
-
-    # Most passages already have audio_url from import_stories.py.
-    # This is just a safety net for the few that failed during import,
-    # or for passages added later outside the import script.
-    if not passage.audio_url:
-        try:
-            audio_filename = f"passage_{passage_id}.mp3"
-            audio_path = f"static/{audio_filename}"
-            text_to_speech(passage.content, audio_path)
-            passage.audio_url = f"{BASE_URL}/static/{audio_filename}"
-            db.commit()
-        except Exception as e:
-            print(f"⚠️ Audio generation failed for passage {passage_id}: {e}")
-            # leave audio_url as None — frontend just hides the listen button
 
     images = db.query(models.StoryImage).filter(
         models.StoryImage.passage_id == passage_id
@@ -922,7 +917,6 @@ def get_full_passage(
         "title": passage.title,
         "content": passage.content,
         "level": passage.level,
-        "audio_url": passage.audio_url,
         "images": images,
         "questions": questions
     }
