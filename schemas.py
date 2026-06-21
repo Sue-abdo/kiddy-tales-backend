@@ -145,6 +145,71 @@ class StoryReadingEvaluateResponse(BaseModel):
     is_passed: bool
     whisper_transcript: str
 
+
+
+# ════════════════════════════════
+#   READING SCHEMAS
+# ════════════════════════════════
+
+class PassageCreate(BaseModel):
+    title: str
+    content: str
+    level: int
+
+    @field_validator('level')
+    @classmethod
+    def validate_level(cls, v):
+        if v not in [1, 2, 3]:
+            raise ValueError('Level must be 1, 2, or 3')
+        return v
+
+
+class PassageResponse(BaseModel):
+    id: int
+    title: str
+    content: str
+    level: int
+    audio_url: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PassagesListResponse(BaseModel):
+    passages: List[PassageResponse]
+
+
+class ReadingEvaluateResponse(BaseModel):
+    passage_id: int
+    score: int
+    total_words: int
+    correct_words: int
+    missed_words: List[str]
+    whisper_transcript: str
+    feedback: str
+    is_passed: bool          # True if score >= 60%
+
+
+class ReadingResultResponse(BaseModel):
+    id: int
+    passage_id: int
+    whisper_transcript: str
+    score: int
+    missed_words: str
+    feedback: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReadingProgressResponse(BaseModel):
+    child_name: str
+    total_attempts: int
+    average_score: float
+    results: List[ReadingResultResponse]
+
 # ════════════════════════════════
 #   READING QUESTIONS SCHEMAS
 # ════════════════════════════════
@@ -195,6 +260,7 @@ class SubmitReadingAnswersResponse(BaseModel):
     parent_feedback: str
     results: List[ReadingAnswerResult]
 
+
 # ════════════════════════════════════════════════════════
 # ════════════════════════════════════════════════════════
 
@@ -210,13 +276,12 @@ class StoryImageResponse(BaseModel):
 class FullPassageResponse(BaseModel):
     """
     The ONE combined response Flutter needs to render a reading screen:
-    story text + audio (TTS, so the child can listen first) + all images + questions
+    story text + all images + all questions (no audio_url — TTS not used here)
     """
     id: int
     title: str
     content: str
     level: int
-    audio_url:Optional[str]=None
     images: List[StoryImageResponse]
     questions: List[ReadingQuestionResponse]
 
