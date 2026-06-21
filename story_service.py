@@ -20,7 +20,7 @@ def get_groq_client():
     return client
 
 
-def correct_words(words: str) -> dict:
+def correct_words(words: str) -> dict: 
     """
     Check and correct spelling mistakes
     Returns: corrected words + was_corrected flag
